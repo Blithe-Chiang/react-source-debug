@@ -1,0 +1,96 @@
+:root {
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  color: #1d1b18;
+  background:
+    radial-gradient(circle at top, rgba(226, 198, 143, 0.4), transparent 45%),
+    linear-gradient(160deg, #f7f0de 0%, #efe3c4 48%, #e4d1a4 100%);
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+code {
+  font: inherit;
+}
+
+code {
+  font-family: "SF Mono", "Menlo", monospace;
+}
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.panel {
+  width: min(720px, 100%);
+  padding: 32px;
+  border: 1px solid rgba(69, 49, 8, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 251, 241, 0.82);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 60px rgba(75, 52, 10, 0.15);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7d5b22;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.description {
+  margin: 18px 0 0;
+  font-size: 1.02rem;
+  color: #433721;
+}
+
+.card {
+  margin-top: 24px;
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-radius: 18px;
+  background: rgba(242, 228, 191, 0.72);
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  color: #fffdf7;
+  background: linear-gradient(135deg, #6d4e19, #9d6d1a);
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 24px;
+  }
+}
