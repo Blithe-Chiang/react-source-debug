@@ -1,4 +1,4 @@
-function readPort(value, fallback) {
+function readPort(value: string | undefined, fallback: number) {
   const port = Number.parseInt(value ?? "", 10);
   return Number.isFinite(port) ? port : fallback;
 }

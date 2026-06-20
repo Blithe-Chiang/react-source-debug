@@ -2,10 +2,14 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import {installReactSourceRuntimeHmr} from "./reactSourceRuntimeHmr";
 
-const root = createRoot(document.getElementById("root")!);
+const container = document.getElementById("root")!;
+let root = createRoot(container);
+let currentApp = App;
 
-function render(AppComponent = App) {
+function render(AppComponent = currentApp) {
+  currentApp = AppComponent;
   root.render(
     <React.StrictMode>
       <AppComponent />
@@ -15,8 +19,12 @@ function render(AppComponent = App) {
 
 render();
 
-if (import.meta.hot) {
-  import.meta.hot.accept(["./App", "react", "react-dom/client"], ([nextApp]) => {
-    render(nextApp?.default ?? App);
-  });
-}
+installReactSourceRuntimeHmr({
+  container,
+  getRoot: () => root,
+  setRoot: (nextRoot) => {
+    root = nextRoot;
+  },
+  getApp: () => currentApp,
+  render,
+});

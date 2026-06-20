@@ -19,5 +19,10 @@
       }
     ]
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "react-source-debug.config.ts",
+    "plugins/react-source-vite-plugin.ts"
+  ]
 }

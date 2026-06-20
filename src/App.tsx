@@ -11,7 +11,8 @@ export default function App() {
         <h1>Vite 运行的是 react-source 里的源码</h1>
         <p className="description">
           现在可以直接在 <code>react-source/packages</code> 里加{" "}
-          <code>console.log</code> 或 <code>debugger</code>，刷新页面后观察运行时行为。
+          <code>console.log</code> 或 <code>debugger</code>
+          ，刷新页面后观察运行时行为。
         </p>
         <div className="card">
           <button type="button" onClick={() => setCount((value) => value + 1)}>
