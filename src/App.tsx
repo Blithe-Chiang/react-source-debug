@@ -1,5 +1,4 @@
-import * as React from "./react-source/react";
-import { useMemo, useState } from "./react-source/react";
+import { useMemo, useState } from "react";
 
 export default function App() {
   const [count, setCount] = useState(0);

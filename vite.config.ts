@@ -10,19 +10,32 @@ import debugConfig from "./react-source-debug.config.mjs";
 
 const require = createRequire(import.meta.url);
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
-const reactSourceRoot = path.resolve(debugConfig.reactSourceDir);
+const reactSourceRoot = path.join(projectRoot, "react-source");
 const packagesRoot = path.join(reactSourceRoot, "packages");
 
 if (!fs.existsSync(packagesRoot)) {
   throw new Error(
     [
       `react-source packages directory not found: ${packagesRoot}`,
-      "Set REACT_SOURCE_DIR or edit react-source-debug.config.mjs to point to a valid React source checkout.",
+      "Run `git submodule update --init --recursive` to initialize the React source submodule.",
     ].join("\n"),
   );
 }
 
 const flowStripPlugin = require.resolve("@babel/plugin-transform-flow-strip-types");
+const domPluginEventSystemId = path.join(
+  packagesRoot,
+  "react-dom-bindings/src/events/DOMPluginEventSystem.js",
+);
+const watchedReactSourceRoots = [
+  "react",
+  "react-client",
+  "react-dom",
+  "react-dom-bindings",
+  "react-reconciler",
+  "scheduler",
+  "shared",
+].map((packageName) => pkgPath(packageName));
 
 function normalizeId(id: string) {
   return id.split("?", 1)[0].replace(/^\/@fs/, "");
@@ -31,6 +44,27 @@ function normalizeId(id: string) {
 function isReactSourceFile(id: string) {
   const normalizedId = normalizeId(id);
   return normalizedId.startsWith(packagesRoot) && normalizedId.endsWith(".js");
+}
+
+function isInsidePath(filePath: string, parentPath: string) {
+  return filePath === parentPath || filePath.startsWith(`${parentPath}${path.sep}`);
+}
+
+function isWatchedReactSourcePath(filePath: string) {
+  return watchedReactSourceRoots.some((root) => isInsidePath(filePath, root));
+}
+
+function shouldIgnoreWatcherPath(filePath: string, stats?: fs.Stats) {
+  const normalizedPath = normalizeId(filePath);
+  if (!isInsidePath(normalizedPath, reactSourceRoot)) {
+    return false;
+  }
+
+  if (!isWatchedReactSourcePath(normalizedPath)) {
+    return true;
+  }
+
+  return stats?.isFile() === true && !normalizedPath.endsWith(".js");
 }
 
 function reactSourceFlowPlugin(): Plugin {
@@ -63,11 +97,49 @@ function reactSourceFlowPlugin(): Plugin {
       }
 
       return {
-        code: result.code,
+        code: patchReactSourceCode(normalizedId, result.code),
         map: result.map ?? null,
       };
     },
   };
+}
+
+function patchReactSourceCode(id: string, code: string) {
+  if (id !== domPluginEventSystemId) {
+    return code;
+  }
+
+  const registrationBlock = [
+    "SimpleEventPlugin.registerEvents();",
+    "EnterLeaveEventPlugin.registerEvents();",
+    "ChangeEventPlugin.registerEvents();",
+    "SelectEventPlugin.registerEvents();",
+    "BeforeInputEventPlugin.registerEvents();",
+    "if (enableScrollEndPolyfill) {",
+    "  ScrollEndEventPlugin.registerEvents();",
+    "}",
+  ].join("\n");
+
+  return code
+    .replace(
+      "import { allNativeEvents } from './EventRegistry';",
+      "import { allNativeEvents, registrationNameDependencies } from './EventRegistry';",
+    )
+    .replace(
+      registrationBlock,
+      [
+        "if (!registrationNameDependencies.onClick) {",
+        "  SimpleEventPlugin.registerEvents();",
+        "  EnterLeaveEventPlugin.registerEvents();",
+        "  ChangeEventPlugin.registerEvents();",
+        "  SelectEventPlugin.registerEvents();",
+        "  BeforeInputEventPlugin.registerEvents();",
+        "  if (enableScrollEndPolyfill) {",
+        "    ScrollEndEventPlugin.registerEvents();",
+        "  }",
+        "}",
+      ].join("\n"),
+    );
 }
 
 function reactSourceForkPlugin(): Plugin {
@@ -110,15 +182,43 @@ function reactSourceForkPlugin(): Plugin {
   };
 }
 
+function reactSourceSchedulerPlugin(): Plugin {
+  const schedulerImport = pkgPath("scheduler/index.js");
+  const virtualSchedulerId = "\0react-source-scheduler";
+
+  return {
+    name: "react-source-scheduler",
+    enforce: "pre",
+    resolveId(source) {
+      if (source === "scheduler") {
+        return virtualSchedulerId;
+      }
+
+      return null;
+    },
+    load(id) {
+      if (id !== virtualSchedulerId) {
+        return null;
+      }
+
+      return [
+        `export * from ${JSON.stringify(schedulerImport)};`,
+        "export function log() {}",
+        "export function unstable_setDisableYieldValue() {}",
+      ].join("\n");
+    },
+  };
+}
+
 function reactSourceHotReloadPlugin(): Plugin {
   return {
     name: "react-source-hot-reload",
     configureServer(server) {
-      server.watcher.add(packagesRoot);
+      server.watcher.add(watchedReactSourceRoots);
     },
     handleHotUpdate(ctx) {
       const changedFile = normalizeId(ctx.file);
-      if (!changedFile.startsWith(packagesRoot)) {
+      if (!isReactSourceFile(changedFile) || !isWatchedReactSourcePath(changedFile)) {
         return;
       }
 
@@ -127,12 +227,17 @@ function reactSourceHotReloadPlugin(): Plugin {
         ctx.server.moduleGraph.invalidateModule(mod);
       }
 
-      ctx.server.ws.send({
-        type: "full-reload",
-        path: "*",
-      });
+      return [...directModules];
+    },
+  };
+}
 
-      return [];
+function reactSourceDependencyOptimizerPlugin(): Plugin {
+  return {
+    name: "react-source-dependency-optimizer",
+    enforce: "post",
+    configResolved(config) {
+      config.optimizeDeps.include = [];
     },
   };
 }
@@ -144,9 +249,11 @@ function pkgPath(...segments: string[]) {
 export default defineConfig({
   plugins: [
     reactSourceForkPlugin(),
+    reactSourceSchedulerPlugin(),
     reactSourceFlowPlugin(),
     reactSourceHotReloadPlugin(),
-    react({ jsxRuntime: "classic" }),
+    react(),
+    reactSourceDependencyOptimizerPlugin(),
   ],
   esbuild: false,
   resolve: {
@@ -175,10 +282,6 @@ export default defineConfig({
         replacement: pkgPath("react-dom/client.js"),
       },
       { find: /^react-dom\/(.*)$/, replacement: `${pkgPath("react-dom")}/$1` },
-      {
-        find: /^scheduler$/,
-        replacement: path.join(projectRoot, "src/react-source/scheduler-shim.js"),
-      },
       { find: /^scheduler\/(.*)$/, replacement: `${pkgPath("scheduler")}/$1` },
       {
         find: /^shared\/ReactDOMSharedInternals$/,
@@ -213,13 +316,23 @@ export default defineConfig({
     __VARIANT__: "false",
   },
   optimizeDeps: {
-    disabled: "dev",
     noDiscovery: true,
     include: [],
+    exclude: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "scheduler",
+    ],
   },
   server: {
     host: debugConfig.devServer.host,
     port: debugConfig.devServer.port,
+    watch: {
+      ignored: shouldIgnoreWatcherPath,
+    },
     fs: {
       allow: [projectRoot, reactSourceRoot],
     },

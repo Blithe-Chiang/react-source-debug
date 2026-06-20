@@ -10,9 +10,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "strict": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "react/canary", "react-dom/canary"],
+    "plugins": [
+      {
+        "name": "react-source-definition-plugin"
+      }
+    ]
   },
   "include": ["src"]
 }

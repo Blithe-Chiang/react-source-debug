@@ -1,10 +1,22 @@
-import * as React from "./react-source/react";
-import { createRoot } from "./react-source/react-dom-client";
+import * as React from "react";
+import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+const root = createRoot(document.getElementById("root")!);
+
+function render(AppComponent = App) {
+  root.render(
+    <React.StrictMode>
+      <AppComponent />
+    </React.StrictMode>,
+  );
+}
+
+render();
+
+if (import.meta.hot) {
+  import.meta.hot.accept(["./App", "react", "react-dom/client"], ([nextApp]) => {
+    render(nextApp?.default ?? App);
+  });
+}

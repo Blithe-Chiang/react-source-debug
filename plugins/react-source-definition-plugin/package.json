@@ -1,0 +1,6 @@
+{
+  "name": "react-source-definition-plugin",
+  "version": "0.0.0",
+  "main": "index.cjs",
+  "private": true
+}
